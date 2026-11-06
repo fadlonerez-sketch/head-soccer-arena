@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Head Soccer Arena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+
+  <!-- in-game buttons -->
+  <button id="pause-btn" class="hidden" data-action="pause" title="Pause (Esc / P)">⏸</button>
+  <div id="touch" class="hidden">
+    <div class="tgroup">
+      <button data-t="left">◀</button>
+      <button data-t="right">▶</button>
+    </div>
+    <div class="tgroup">
+      <button data-t="power" class="tpower">⚡</button>
+      <button data-t="jump">▲</button>
+      <button data-t="kick" class="tkick">KICK</button>
+    </div>
+  </div>
+
+  <!-- ===== MAIN MENU ===== -->
+  <div class="screen" id="scr-menu">
+    <div class="wallet"><span>🪙 <b class="coins">0</b></span><span>💎 <b class="diamonds">0</b></span></div>
+    <button id="mute-btn" class="corner-btn" data-action="mute">🔊</button>
+    <h1 class="logo">Head Soccer<br><span>Arena</span></h1>
+    <div class="menu-buttons">
+      <button class="btn" data-action="goto-quick">⚽ Quick Match</button>
+      <button class="btn" data-action="goto-2p">👥 2 Players</button>
+      <button class="btn" data-action="goto-career">🏆 <span id="career-label">Career</span></button>
+      <button class="btn alt" data-action="goto-shop">🛒 Shop</button>
+      <button class="btn ghost" data-action="goto-help">❔ How to play</button>
+    </div>
+  </div>
+
+  <!-- ===== QUICK MATCH ===== -->
+  <div class="screen hidden" id="scr-quick">
+    <h2>Quick Match</h2>
+    <p class="sub">Pick a difficulty</p>
+    <div class="menu-buttons row">
+      <button class="btn easy" data-action="quick" data-diff="easy">Easy</button>
+      <button class="btn" data-action="quick" data-diff="normal">Normal</button>
+      <button class="btn hard" data-action="quick" data-diff="hard">Hard</button>
+    </div>
+    <button class="btn ghost back" data-action="goto-menu">← Back</button>
+  </div>
+
+  <!-- ===== 2 PLAYERS ===== -->
+  <div class="screen hidden" id="scr-2p">
+    <h2>2 Players</h2>
+    <div class="p2-sides">
+      <div class="p2-side" id="p2-side-0">
+        <h3>Player 1 <small>W A S D + F</small></h3>
+        <div class="pv"></div>
+        <div class="picker"><button data-cyc="c:-1">◀</button><span class="cname"></span><button data-cyc="c:1">▶</button></div>
+        <div class="picker"><button data-cyc="p:-1">◀</button><span class="pname"></span><button data-cyc="p:1">▶</button></div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="p2-side" id="p2-side-1">
+        <h3>Player 2 <small>Arrows + K</small></h3>
+        <div class="pv"></div>
+        <div class="picker"><button data-cyc="c:-1">◀</button><span class="cname"></span><button data-cyc="c:1">▶</button></div>
+        <div class="picker"><button data-cyc="p:-1">◀</button><span class="pname"></span><button data-cyc="p:1">▶</button></div>
+      </div>
+    </div>
+    <div class="menu-buttons row">
+      <button class="btn ghost" data-action="goto-menu">← Back</button>
+      <button class="btn" data-action="start-2p">Kick off!</button>
+    </div>
+  </div>
+
+  <!-- ===== CAREER ===== -->
+  <div class="screen hidden" id="scr-career">
+    <div class="wallet"><span>🪙 <b class="coins">0</b></span><span>💎 <b class="diamonds">0</b></span></div>
+    <h2>Career</h2>
+    <div id="league-ladder"></div>
+    <div id="career-info"></div>
+    <div class="menu-buttons row">
+      <button class="btn ghost" data-action="goto-menu">← Back</button>
+      <button class="btn ghost" data-action="career-reset">Reset</button>
+      <button class="btn" id="career-play" data-action="career-play">Play match</button>
+    </div>
+  </div>
+
+  <!-- ===== SHOP ===== -->
+  <div class="screen hidden" id="scr-shop">
+    <div class="wallet"><span>🪙 <b class="coins">0</b></span><span>💎 <b class="diamonds">0</b></span></div>
+    <h2>Shop</h2>
+    <div class="tabs">
+      <button class="tab active" data-action="shop-tab" data-tab="upgrades">Upgrades</button>
+      <button class="tab" data-action="shop-tab" data-tab="powers">Powers</button>
+      <button class="tab" data-action="shop-tab" data-tab="chars">Characters</button>
+    </div>
+    <div id="shop-body"></div>
+    <button class="btn ghost back" data-action="goto-menu">← Back</button>
+  </div>
+
+  <!-- ===== HELP ===== -->
+  <div class="screen hidden" id="scr-help">
+    <h2>How to play</h2>
+    <div class="help">
+      <p>Score more goals than your opponent before the clock runs out. Head it, kick it, bounce it off the crossbar!</p>
+      <table>
+        <tr><th></th><th>Move</th><th>Jump</th><th>Kick</th><th>Power</th></tr>
+        <tr><td>1 player</td><td>A D / ← →</td><td>W / ↑</td><td>Space</td><td>S / ↓</td></tr>
+        <tr><td>2P left</td><td>A D</td><td>W</td><td>F</td><td>S</td></tr>
+        <tr><td>2P right</td><td>← →</td><td>↑</td><td>K</td><td>↓</td></tr>
+      </table>
+      <p>The power bar fills over time and when you touch the ball. When it glows, fire your power:
+        ❄️ freeze · ⚡ thunder shot · 🔨 anvil · 🎈 giant head.</p>
+      <p>Win matches to earn 🪙 coins (upgrades &amp; powers) and 💎 diamonds (new characters). Esc / P pauses.</p>
+    </div>
+    <button class="btn ghost back" data-action="goto-menu">← Back</button>
+  </div>
+
+  <!-- ===== PAUSE ===== -->
+  <div class="screen hidden dim" id="scr-pause">
+    <h2>Paused</h2>
+    <div class="menu-buttons">
+      <button class="btn" data-action="resume">Resume</button>
+      <button class="btn ghost" data-action="quit">Quit to menu</button>
+    </div>
+  </div>
+
+  <!-- ===== END OF MATCH ===== -->
+  <div class="screen hidden dim" id="scr-end">
+    <h2 id="end-title">Full time</h2>
+    <div id="end-details"></div>
+    <div class="menu-buttons row">
+      <button class="btn ghost" id="end-rematch" data-action="end-rematch">Rematch</button>
+      <button class="btn" id="end-continue" data-action="end-continue">Continue</button>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="game.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>

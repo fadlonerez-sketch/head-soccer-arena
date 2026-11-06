@@ -1,0 +1,423 @@
+/* ============================================================
+   style.css — menus and overlays drawn on top of the canvas.
+   #wrap is a 16:9 box sized by fit() in ui.js, which also sets its
+   font-size (16px at 1280px wide), so everything here uses em and
+   scales with the game.
+   ============================================================ */
+
+:root {
+  --bg: #0b1a3a;
+  --panel: rgba(12, 20, 45, 0.88);
+  --panel-line: rgba(255, 255, 255, 0.14);
+  --text: #f4f6fb;
+  --muted: #aab4cf;
+  --accent: #ffb703;
+  --accent-2: #fb8500;
+  --go: #2ec27e;
+  --go-dark: #1e8f5b;
+  --danger: #e63946;
+  --blue: #4cc9f0;
+  --title-font: 'Luckiest Guy', Impact, 'Arial Black', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, #16284f 0%, #050a18 100%);
+  color: var(--text);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#wrap {
+  position: relative;
+  /* real width/height/font-size are set by fit(); these are fallbacks */
+  width: min(100vw, 177.78vh);
+  height: min(100vh, 56.25vw);
+  overflow: hidden;
+  background: var(--bg);
+  box-shadow: 0 0 4em rgba(0, 0, 0, 0.6);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.hidden { display: none !important; }
+
+/* ---------------- screens (menus / overlays) ---------------- */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;   /* "safe": tall screens scroll instead of losing their top */
+  gap: 1em;
+  padding: 2em 3em;
+  overflow-y: auto;
+  background: linear-gradient(180deg, rgba(5, 10, 30, 0.55) 0%, rgba(5, 10, 30, 0.8) 100%);
+  animation: fade-in 0.2s ease-out;
+}
+.screen.dim { background: rgba(5, 10, 30, 0.62); backdrop-filter: blur(3px); }
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+h1, h2, h3, h4 {
+  margin: 0;
+  font-family: var(--title-font);
+  font-weight: normal;
+  letter-spacing: 0.03em;
+  text-align: center;
+}
+h2 { font-size: 3.2em; color: #fff; text-shadow: 0 0.08em 0 #1a1a2e, 0 0 0.6em rgba(255, 183, 3, 0.35); }
+h3 { font-size: 1.5em; }
+h3 small { display: block; font-family: system-ui, sans-serif; font-size: 0.55em; color: var(--muted); letter-spacing: 0; }
+h4 { font-size: 1.3em; }
+p { margin: 0.3em 0; line-height: 1.4; }
+.sub { color: var(--muted); font-size: 1.2em; margin-top: -0.5em; }
+.hint { color: var(--muted); font-size: 0.9em; }
+
+/* logo */
+.logo {
+  font-size: 5.6em;
+  line-height: 0.95;
+  color: #fff;
+  text-shadow: 0 0.07em 0 #1a1a2e, 0 0.12em 0.4em rgba(0, 0, 0, 0.5);
+  transform: rotate(-3deg);
+  margin-bottom: 0.2em;
+}
+.logo span {
+  display: inline-block;
+  text-shadow: none;          /* a text-shadow would paint over the clipped gradient */
+  font-size: 1.25em;
+  background: linear-gradient(180deg, #fff3b0, var(--accent) 55%, var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0.06em 0 #1a1a2e);
+}
+
+/* ---------------- buttons ---------------- */
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.7em;
+  min-width: 22em;
+}
+.menu-buttons.row { flex-direction: row; justify-content: center; min-width: 0; flex-wrap: wrap; }
+
+.btn {
+  font-family: var(--title-font);
+  font-size: 1.6em;
+  letter-spacing: 0.04em;
+  color: #fff;
+  padding: 0.45em 1.4em 0.35em;
+  border: 0;
+  border-radius: 0.7em;
+  cursor: pointer;
+  background: linear-gradient(180deg, #4ade80 0%, var(--go) 50%, var(--go-dark) 100%);
+  box-shadow: 0 0.2em 0 #14613e, 0 0.35em 0.8em rgba(0, 0, 0, 0.35);
+  text-shadow: 0 0.06em 0 rgba(0, 0, 0, 0.35);
+  transition: transform 0.08s, filter 0.15s, box-shadow 0.08s;
+}
+.btn:hover { filter: brightness(1.1); transform: translateY(-0.05em); }
+.btn:active { transform: translateY(0.15em); box-shadow: 0 0.05em 0 #14613e, 0 0.15em 0.4em rgba(0, 0, 0, 0.35); }
+.btn:focus-visible { outline: 0.15em solid #fff; outline-offset: 0.15em; }
+.btn:disabled {
+  cursor: default;
+  filter: grayscale(0.85) brightness(0.75);
+  transform: none;
+}
+
+.btn.alt { background: linear-gradient(180deg, #ffd166 0%, var(--accent) 50%, var(--accent-2) 100%); box-shadow: 0 0.2em 0 #a35400, 0 0.35em 0.8em rgba(0, 0, 0, 0.35); }
+.btn.easy { background: linear-gradient(180deg, #7dd3fc 0%, #38bdf8 50%, #0284c7 100%); box-shadow: 0 0.2em 0 #075985, 0 0.35em 0.8em rgba(0, 0, 0, 0.35); }
+.btn.hard { background: linear-gradient(180deg, #ff7a85 0%, var(--danger) 50%, #a4161a 100%); box-shadow: 0 0.2em 0 #660708, 0 0.35em 0.8em rgba(0, 0, 0, 0.35); }
+.btn.ghost {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 0.1em rgba(255, 255, 255, 0.35);
+  font-size: 1.3em;
+}
+.btn.ghost:active { box-shadow: inset 0 0 0 0.1em rgba(255, 255, 255, 0.5); }
+.btn.small { font-size: 1.05em; padding: 0.45em 1em 0.35em; border-radius: 0.6em; }
+.back { margin-top: 0.5em; }
+
+/* wallet + corner buttons */
+.wallet {
+  position: absolute;
+  top: 1em;
+  left: 1.2em;
+  display: flex;
+  gap: 0.6em;
+}
+.wallet span {
+  background: var(--panel);
+  border: 0.08em solid var(--panel-line);
+  border-radius: 2em;
+  padding: 0.35em 1em;
+  font-size: 1.2em;
+}
+.wallet b { font-family: var(--title-font); font-weight: normal; letter-spacing: 0.04em; }
+
+.corner-btn, #pause-btn {
+  position: absolute;
+  top: 1em;
+  right: 1.2em;
+  width: 2.6em;
+  height: 2.6em;
+  border-radius: 50%;
+  border: 0.08em solid var(--panel-line);
+  background: var(--panel);
+  color: #fff;
+  font-size: 1.2em;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.corner-btn:hover, #pause-btn:hover { background: rgba(40, 55, 100, 0.95); }
+/* in a match the pause button sits under the scoreboard */
+#pause-btn { top: 7.2em; right: auto; left: 50%; transform: translateX(-50%); width: 2.2em; height: 2.2em; font-size: 1em; z-index: 5; }
+
+/* ---------------- 2-player setup ---------------- */
+.p2-sides { display: flex; align-items: center; gap: 2.5em; }
+.p2-side {
+  background: var(--panel);
+  border: 0.08em solid var(--panel-line);
+  border-radius: 1.2em;
+  padding: 1em 1.6em 1.2em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5em;
+  min-width: 17em;
+}
+.pv { height: 8.3em; display: flex; align-items: flex-end; }
+.pv canvas { width: 7.5em; height: auto; }
+.picker { display: flex; align-items: center; gap: 0.6em; width: 100%; justify-content: space-between; }
+.picker span { font-family: var(--title-font); font-size: 1.2em; letter-spacing: 0.03em; text-align: center; flex: 1; }
+.picker button {
+  width: 2.2em;
+  height: 2.2em;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 1em;
+  cursor: pointer;
+}
+.picker button:hover { background: rgba(255, 255, 255, 0.28); }
+.vs {
+  font-family: var(--title-font);
+  font-size: 3.5em;
+  color: var(--accent);
+  text-shadow: 0 0.07em 0 #1a1a2e;
+}
+
+/* ---------------- career ---------------- */
+#league-ladder {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5em;
+  width: min(100%, 60em);
+}
+.league {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.45em 0.7em;
+  border-radius: 0.7em;
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.08em solid var(--panel-line);
+  font-size: 0.9em;
+  min-width: 0;
+}
+.league b {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.9em;
+  height: 1.9em;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  font-family: var(--title-font);
+  font-weight: normal;
+}
+.league span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.league.done { background: rgba(46, 194, 126, 0.18); border-color: rgba(46, 194, 126, 0.55); }
+.league.done b { background: var(--go); }
+.league.current {
+  background: rgba(255, 183, 3, 0.2);
+  border-color: var(--accent);
+  box-shadow: 0 0 1em rgba(255, 183, 3, 0.35);
+}
+.league.current b { background: var(--accent); color: #1a1a2e; }
+.league.locked { opacity: 0.5; }
+
+#career-info {
+  display: flex;
+  align-items: center;
+  gap: 1.4em;
+  background: var(--panel);
+  border: 0.08em solid var(--panel-line);
+  border-radius: 1.2em;
+  padding: 0.8em 1.8em;
+  width: min(100%, 44em);
+}
+#career-info h3 { text-align: left; color: var(--accent); }
+#career-info canvas { flex: none; width: 6.25em; height: auto; }
+.stars { color: var(--accent); letter-spacing: 0.1em; }
+
+/* ---------------- shop ---------------- */
+.tabs {
+  display: flex;
+  gap: 0.3em;
+  background: var(--panel);
+  padding: 0.3em;
+  border-radius: 2em;
+  border: 0.08em solid var(--panel-line);
+}
+.tab {
+  font-family: var(--title-font);
+  font-size: 1.15em;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 2em;
+  padding: 0.45em 1.4em 0.35em;
+  cursor: pointer;
+}
+.tab:hover { color: #fff; }
+.tab.active { background: var(--accent); color: #1a1a2e; }
+
+#shop-body {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6em;
+  width: min(100%, 76em);
+}
+.card {
+  width: 9.4em;               /* 7 character cards fit on one row */
+  background: var(--panel);
+  border: 0.1em solid var(--panel-line);
+  border-radius: 1.1em;
+  padding: 0.9em 0.9em 1em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.35em;
+}
+.card.selected { border-color: var(--go); box-shadow: 0 0 1.2em rgba(46, 194, 126, 0.4); }
+.card p { color: var(--muted); font-size: 0.85em; flex: 1; }
+.card .btn { margin-top: 0.4em; width: 100%; }
+.card canvas { width: 5.6em; height: auto; }
+.card > div:not(.big-icon):not(.pips) { width: 100%; }
+.big-icon { font-size: 2.6em; line-height: 1.1; }
+
+.pips { display: flex; gap: 0.3em; margin: 0.2em 0; }
+.pips i {
+  width: 1.2em;
+  height: 0.55em;
+  border-radius: 0.3em;
+  background: rgba(255, 255, 255, 0.15);
+}
+.pips i.on { background: linear-gradient(90deg, var(--blue), #4ade80); }
+
+.stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85em;
+  padding: 0.1em 0.3em;
+  border-bottom: 0.08em solid rgba(255, 255, 255, 0.07);
+}
+.stat span { color: var(--muted); text-transform: capitalize; }
+.stat b.pos { color: #4ade80; }
+.stat b.neg { color: #ff7a85; }
+
+/* ---------------- help ---------------- */
+.help {
+  background: var(--panel);
+  border: 0.08em solid var(--panel-line);
+  border-radius: 1.2em;
+  padding: 1.2em 2em;
+  max-width: 46em;
+  font-size: 1.05em;
+}
+.help table { width: 100%; border-collapse: collapse; margin: 0.8em 0; }
+.help th, .help td { padding: 0.4em 0.6em; text-align: center; border-bottom: 0.08em solid var(--panel-line); }
+.help th { font-family: var(--title-font); font-weight: normal; color: var(--accent); letter-spacing: 0.04em; }
+.help td:first-child { text-align: left; color: var(--muted); }
+
+/* ---------------- end of match ---------------- */
+#end-title { font-size: 4.2em; }
+#end-details { text-align: center; font-size: 1.2em; }
+.final { font-family: var(--title-font); font-size: 3em; letter-spacing: 0.08em; margin: 0; }
+.reward {
+  display: inline-block;
+  font-family: var(--title-font);
+  font-size: 1.5em;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  background: var(--panel);
+  border-radius: 2em;
+  padding: 0.3em 1.2em 0.2em;
+  margin: 0.3em 0 0.6em;
+}
+
+/* ---------------- touch controls ---------------- */
+#touch {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1.2em;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 1.5em;
+  pointer-events: none;
+  z-index: 4;
+}
+.tgroup { display: flex; gap: 1em; align-items: flex-end; }
+#touch button {
+  pointer-events: auto;
+  touch-action: none;
+  width: 5.5em;
+  height: 5.5em;
+  border-radius: 50%;
+  border: 0.15em solid rgba(255, 255, 255, 0.55);
+  background: rgba(10, 20, 45, 0.45);
+  color: #fff;
+  font-family: var(--title-font);
+  font-size: 1.3em;
+  backdrop-filter: blur(2px);
+}
+#touch button.down { background: rgba(255, 255, 255, 0.35); transform: scale(0.94); }
+#touch .tkick { width: 6.8em; height: 6.8em; background: rgba(46, 194, 126, 0.5); }
+#touch .tpower { background: rgba(255, 183, 3, 0.45); }
+
+/* ---------------- small / short screens ----------------
+   #wrap's font-size already scales with its width; on very small boxes
+   bump it so menus stay readable and tappable. */
+@media (max-height: 420px), (max-width: 700px) {
+  .screen { padding: 1em 1.5em; gap: 0.6em; }
+  .logo { font-size: 4.4em; }
+  .menu-buttons { min-width: 18em; }
+  .p2-sides { gap: 1em; }
+}
