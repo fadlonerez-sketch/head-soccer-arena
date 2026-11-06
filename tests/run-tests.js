@@ -126,7 +126,21 @@ async function runSuite(browserInfo) {
     const shot = name => page.screenshot({ path: `${OUT}/${name}.png` });
     const ev = (fn, ...a) => page.evaluate(fn, ...a);
     const visible = id => ev(i => !document.getElementById(i).classList.contains('hidden'), id);
-    const hold = async (key, ms) => { await page.keyboard.down(key); await sleep(ms); await page.keyboard.up(key); };
+    // Gameplay timing runs on the game's own clock (Game.match.frame = fixed 1/60 s steps), not on wall time:
+    // a screenshot or a busy machine can stall rendering for longer than a short key press, so a press timed
+    // in milliseconds may never be seen by any game step. Keys are therefore held for a number of game steps,
+    // and results are awaited by polling game state with a generous bound (the assertions are unchanged).
+    const frameNow = () => ev(() => Game.match ? Game.match.frame : -1);
+    const until = (fn, arg, timeout = 15000) =>
+      page.waitForFunction(fn, { timeout, polling: 'raf' }, arg).then(() => true, () => false);
+    const waitFrames = async n => until(t => !!Game.match && Game.match.frame >= t, (await frameNow()) + n);
+    const holdFrames = async (key, n) => { await page.keyboard.down(key); await waitFrames(n); await page.keyboard.up(key); };
+    // hold a key until the game reports the expected result (or the bound expires), then release it
+    const holdUntil = async (key, fn, timeout = 15000) => {
+      await page.keyboard.down(key);
+      try { return await until(fn, undefined, timeout); } finally { await page.keyboard.up(key); }
+    };
+    const freezeAI = secs => ev(t => { const ai = Game.match.players[1]; ai.frozen = t; ai.chargeMul = 0; ai.power = 0; }, secs);
 
     // --- layout / css
     await ev(() => document.fonts.ready);
@@ -162,77 +176,100 @@ async function runSuite(browserInfo) {
     await sleep(3000);
     check('state is play after countdown', await ev(() => Game.match.state === 'play'));
 
-    // freeze the AI so it doesn't interfere with movement checks
-    await ev(() => { const ai = Game.match.players[1]; ai.frozen = 3; ai.chargeMul = 0; ai.power = 0; });  // AI never fires powers at us in this test
+    // freeze the AI so it doesn't interfere with movement checks (it never fires powers at us in this test),
+    // and park the kickoff ball out of reach so a stray header can't score a goal during them
+    await freezeAI(60);
+    await ev(() => { const b = Game.match.ball; b.x = CONFIG.W * 0.62; b.y = CONFIG.GROUND - b.r; b.vx = 0; b.vy = 0; });
     const x0 = await ev(() => Game.match.players[0].x);
-    await hold('KeyD', 500);
+    await holdFrames('KeyD', 30);                                   // 0.5 s of game time
     const x1 = await ev(() => Game.match.players[0].x);
     check('D moves right', x1 > x0 + 50, `${x0.toFixed(0)} -> ${x1.toFixed(0)}`);
-    await hold('ArrowLeft', 500);
+    await holdFrames('ArrowLeft', 30);
     const x2 = await ev(() => Game.match.players[0].x);
     check('ArrowLeft moves left', x2 < x1 - 50, `${x1.toFixed(0)} -> ${x2.toFixed(0)}`);
-    await page.keyboard.down('KeyW'); await sleep(120);
+    await page.keyboard.down('KeyW'); await waitFrames(7);          // ~120 ms of game time into the jump
     const air = await ev(() => CONFIG.GROUND - Game.match.players[0].y);
     await page.keyboard.up('KeyW');
     check('W jumps', air > 30, `height ${air.toFixed(0)}`);
-    await sleep(800);
-    await page.keyboard.down('Space'); await sleep(50);
-    const kick = await ev(() => Game.match.players[0].kickT);
+    await until(() => Game.match.players[0].onGround);              // landed
+    await page.keyboard.down('Space');
+    // the swing lasts only KICK_FRAMES steps: read kickT on the first frame it is set, not some time later
+    const kick = await page.waitForFunction(() => Game.match.players[0].kickT || false, { timeout: 5000, polling: 'raf' })
+      .then(h => h.jsonValue(), () => ev(() => Game.match.players[0].kickT));
     await page.keyboard.up('Space');
-    check('Space kicks', kick > 0, `kickT ${kick}`);
+    check('Space kicks', kick > 0, `kickT ${kick} (state ${await ev(() => Game.match.state)})`);
+    await until(() => Game.match.players[0].kickT === 0);           // swing finished
 
     // real kick hits the ball: put the ball in front of the foot, press Space
     await ev(() => {
       const m = Game.match, p = m.players[0], b = m.ball;
       p.x = 400; p.vx = 0; b.x = p.foot.x + 30; b.y = CONFIG.GROUND - b.r; b.vx = 0; b.vy = 0;
     });
-    await sleep(300);
-    await hold('Space', 120);
-    const ballV = await ev(() => Game.match.ball.vx);
+    await waitFrames(18);
+    // record the ball's speed inside the game step in which the kick connects (the ball was at rest), so a
+    // slow machine reading it later can't see it after it bounced off the frozen AI
+    await ev(() => {
+      const m = Game.match, step = Object.getPrototypeOf(m).step;
+      window.__kick = null;
+      m.step = function () { step.call(this); if (!window.__kick && Math.abs(this.ball.vx) > 5) window.__kick = { vx: this.ball.vx }; };
+    });
+    await holdUntil('Space', () => !!window.__kick);
+    const ballV = await ev(() => { delete Game.match.step; return window.__kick ? window.__kick.vx : Game.match.ball.vx; });
     check('kick sends ball forward', ballV > 5, `ball vx ${ballV.toFixed(1)}`);
-    await sleep(400);
+    await waitFrames(24);
     await shot('05-play');
 
     // --- goal
     await ev(() => { const b = Game.match.ball; b.x = CONFIG.W - 60; b.y = CONFIG.GROUND - 50; b.vx = 4; b.vy = 0; });
-    await sleep(150);
+    await until(() => Game.match.state !== 'play', undefined, 5000);
     const g = await ev(() => ({ score: Game.match.score.slice(), state: Game.match.state }));
     check('goal in right net scores for left player', g.score[0] === 1 && g.state === 'goal', JSON.stringify(g));
-    await sleep(250); await shot('06-goal');
-    await sleep(3200);
+    await waitFrames(15); await shot('06-goal');
+    await until(() => Game.match.state === 'play');
     check('kickoff resumes after goal', await ev(() => Game.match.state === 'play'));
+    await freezeAI(60);                                             // the kickoff reset unfroze it
 
     // --- powers: ice
     await ev(() => { Game.match.players[1].frozen = 0; Game.match.players[0].power = 100; Game.match.players[0].powerType = 'ice'; });
-    await sleep(60); await shot('07-power-ready');
-    await hold('KeyS', 80);
+    await shot('07-power-ready');
+    await holdUntil('KeyS', () => Game.match.players[0].power < 100);  // fired (power spent)
     const fz = await ev(() => ({ frozen: Game.match.players[1].frozen, power: Game.match.players[0].power }));
     check('S fires Ice: opponent frozen', fz.frozen > 1 && fz.power < 5, JSON.stringify(fz));
-    await sleep(200); await shot('08-frozen');
+    await waitFrames(12); await shot('08-frozen');
 
     // --- lightning
     await ev(() => { const p = Game.match.players[0]; p.power = 100; p.powerType = 'lightning'; });
-    await hold('ArrowDown', 80);
+    await holdUntil('ArrowDown', () => Game.match.players[0].power < 100);
     check('Down fires Lightning: charged', await ev(() => Game.match.players[0].charged));
     await ev(() => {
       const m = Game.match, p = m.players[0], b = m.ball;
-      m.players[1].frozen = 3; p.x = 300; b.x = p.foot.x + 30; b.y = CONFIG.GROUND - b.r; b.vx = b.vy = 0;
+      m.players[1].frozen = 60; p.x = 300; b.x = p.foot.x + 30; b.y = CONFIG.GROUND - b.r; b.vx = b.vy = 0;
     });
-    await sleep(100);
-    await hold('Space', 120);
-    const th = await ev(() => ({ thunder: !!Game.match.ball.thunder, vx: Game.match.ball.vx }));
+    await waitFrames(6);
+    // record the ball the moment the kick connects (the thunder shot may reach the goal and reset right after)
+    await ev(() => {
+      const m = Game.match, orig = m.thunderShot;
+      window.__thunder = null;
+      m.thunderShot = function (p) { orig.call(this, p); window.__thunder = { thunder: !!this.ball.thunder, vx: this.ball.vx }; };
+    });
+    await holdUntil('Space', () => Game.match.players[0].kickHit || !!window.__thunder);
+    await until(() => !!window.__thunder, undefined, 3000);
+    const th = await ev(() => window.__thunder || { thunder: !!Game.match.ball.thunder, vx: Game.match.ball.vx });
+    await ev(() => { delete Game.match.thunderShot; });             // back to the prototype method
     check('charged kick = thunder shot', th.thunder && th.vx > 15, JSON.stringify(th));
-    await sleep(120); await shot('09-thunder');
-    await sleep(3000);
+    await waitFrames(7); await shot('09-thunder');
+    await until(() => Game.match.state === 'play' && !Game.match.ball.thunder);
+    await freezeAI(60);
 
     // --- anvil + giant (fired by code path, effect checked)
     await ev(() => { const m = Game.match; m.players[1].frozen = 0; m.players[0].powerType = 'anvil'; m.activatePower(m.players[0]); });
-    await sleep(1500);
+    await until(() => Game.match.players[1].stunned > 0 || Game.match.state !== 'play', undefined, 10000);
     check('Anvil stuns opponent', await ev(() => Game.match.players[1].stunned > 0 || Game.match.state !== 'play'));
     await shot('10-anvil');
-    await ev(() => { const m = Game.match, b = m.ball; b.x = CONFIG.W / 2; b.y = 200; b.vx = b.vy = 0; b.thunder = null; m.players[1].frozen = 3; });
+    await until(() => Game.match.state === 'play');
+    await ev(() => { const m = Game.match, b = m.ball; b.x = CONFIG.W / 2; b.y = 200; b.vx = b.vy = 0; b.thunder = null; m.players[1].frozen = 60; });
     await ev(() => { const m = Game.match; m.players[0].powerType = 'giant'; m.activatePower(m.players[0]); });
-    await sleep(800);
+    await until(() => Game.match.players[0].r > CONFIG.HEAD_R * 1.4, undefined, 10000);
     check('Giant head grows', await ev(() => Game.match.players[0].r > CONFIG.HEAD_R * 1.4));
     await shot('11-giant');
 
@@ -244,7 +281,8 @@ async function runSuite(browserInfo) {
     const f2 = await ev(() => Game.match.frame);
     check('Esc pauses (clock stops)', await visible('scr-pause') && t1 === t2);
     await shot('12-pause');
-    await page.click('[data-action="resume"]'); await sleep(300);
+    await page.click('[data-action="resume"]');
+    await until(f => Game.match.frame > f + 5, f2, 5000);
     check('resume continues', !(await visible('scr-pause')) && (await ev(() => Game.match.frame)) > f2 + 5, await ev(() => Game.match.state));
 
     // --- full time
