@@ -1,6 +1,6 @@
 // Headless end-to-end tests for Head Soccer Arena (real page, real key/touch events).
 //
-// The original 48 gameplay checks, plus privacy / safe-DOM checks: no request leaves the computer,
+// The original 48 gameplay checks, plus privacy / safe-DOM / CSP checks: no request leaves the computer,
 // the title font comes from the local fonts/ folder, and a tampered save in localStorage (XSS
 // payloads) is never rendered as markup. The browser always runs headless (never a visible window);
 // the game is loaded from ../index.html via file://. Results are counted as PASS / FAIL / SKIP,
@@ -466,6 +466,21 @@ async function runSuite(browserInfo) {
       sv.upgrades.speed === 0 && sv.upgrades.jump === 2 && sv.upgrades.kick === 0 && dom.coins.every(t => t === '0'),
       JSON.stringify(dom.save));
     await evil.close();
+
+    // ================= Content-Security-Policy =================
+    // Separate, unwatched page: the blocked inline script below is expected to log a CSP error.
+    const csp = await browser.newPage();
+    await csp.goto(URL, { waitUntil: 'networkidle0' });
+    const cspResult = await csp.evaluate(() => {
+      const meta = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+      const s = document.createElement('script');
+      s.textContent = 'window.__inlineRan = true;';
+      document.head.appendChild(s);
+      return { meta: !!meta, inlineRan: window.__inlineRan === true };
+    });
+    check('CSP meta present and blocks injected inline script', cspResult.meta && !cspResult.inlineRan,
+      JSON.stringify(cspResult));
+    await csp.close();
   } finally {
     await browser.close();
   }
@@ -492,7 +507,7 @@ function report(browserInfo, crash) {
     lines.push(String(crash && crash.stack || crash));
     lines.push('Checks after that point did not run and are counted as failed below.');
   }
-  const expected = 53;
+  const expected = 54;
   const notRun = crash ? Math.max(0, expected - results.length) : 0;
   const passed = count('PASS'), failed = count('FAIL') + notRun, skipped = count('SKIP');
   lines.push('');
@@ -528,7 +543,7 @@ function report(browserInfo, crash) {
     return;
   }
   console.log(`Using browser: ${browserInfo.exe} (${browserInfo.how})`);
-  console.log('Running 53 checks in a headless browser (no window is shown). This takes about a minute...\n');
+  console.log('Running 54 checks in a headless browser (no window is shown). This takes about a minute...\n');
   let crash = null;
   try {
     await runSuite(browserInfo);
