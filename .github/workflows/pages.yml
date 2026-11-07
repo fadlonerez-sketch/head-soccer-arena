@@ -1,0 +1,40 @@
+# Publishes the game to GitHub Pages. Manual only: enable Pages (Settings > Pages >
+# Source: "GitHub Actions"), then run this workflow from the Actions tab.
+name: Deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only the game itself is published - no tests/, docs/ or workflow files.
+      - name: Collect game files
+        run: |
+          mkdir -p _site
+          cp index.html config.js game.js ui.js style.css _site/
+          cp -r fonts _site/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
